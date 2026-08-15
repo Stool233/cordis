@@ -35,7 +35,7 @@ The trace suite does not turn a completed finite execution into a liveness proof
 | L-Divert | landing or target change followed by `state-changed` to `Unloading` |
 | L-Raise | `iteration-raised`, error outcome, and transition to `Unloading` |
 | L-Leave | `state-changed` from `Active` to `Unloading` before the differing target is exposed |
-| L-Unload | LIFO `inverse-started`/`inverse-finished`, committed withdrawal, then `Inactive` or `absent` |
+| L-Unload | per-iterator LIFO `inverse-started`/`inverse-finished`, joined top-level recovery, committed withdrawal, then `Inactive` or `absent` |
 
 ## Observation to paper result
 

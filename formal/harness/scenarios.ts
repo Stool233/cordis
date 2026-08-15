@@ -85,6 +85,45 @@ export const scenarios: ScenarioDefinition[] = [
     },
   },
   {
+    name: 'concurrent-root-teardown-guard',
+    assumptions: allAssumptions,
+    requiredProperties: requiredSafety,
+    async run(_implementation, recorder) {
+      const root = recorder.root
+      const resource = { available: true }
+      const observed: boolean[] = []
+      let cleanupStarted!: () => void
+      let releaseCleanup!: () => void
+      const started = new Promise<void>(resolve => { cleanupStarted = resolve })
+      const barrier = new Promise<void>(resolve => { releaseCleanup = resolve })
+      const Provider = named('provider', (ctx: any) => {
+        ctx.provide('service', resource)
+        ctx.effect(() => () => {
+          resource.available = false
+        }, 'backing resource')
+      })
+      const Consumer = named('consumer', (ctx: any) => {
+        void ctx.service
+        return async () => {
+          cleanupStarted()
+          await barrier
+          observed.push(resource.available)
+        }
+      }, { inject: ['service'] })
+      await root.plugin(Provider)
+      await root.plugin(Consumer)
+      const disposing = root.fiber.dispose()
+      await started
+      await Promise.resolve()
+      await Promise.resolve()
+      assert.equal(resource.available, true)
+      releaseCleanup()
+      await disposing
+      assert.deepEqual(observed, [true])
+      assert.equal(resource.available, false)
+    },
+  },
+  {
     name: 'provider-identity-replacement',
     assumptions: allAssumptions,
     requiredProperties: requiredSafety,
@@ -181,27 +220,29 @@ export const scenarios: ScenarioDefinition[] = [
     },
   },
   {
-    name: 'top-level-lifo-recovery',
+    name: 'top-level-concurrent-recovery',
     assumptions: allAssumptions,
     requiredProperties: requiredSafety,
     async run(_implementation, recorder) {
       const root = recorder.root
       const restored: string[] = []
+      let active = 0
+      let maximum = 0
+      const recover = async (label: string) => {
+        restored.push(`${label}:start`)
+        maximum = Math.max(maximum, ++active)
+        await Promise.resolve()
+        restored.push(`${label}:end`)
+        active--
+      }
       const Plugin = named('top-level-effects', (ctx: any) => {
-        ctx.effect(() => async () => {
-          restored.push('first:start')
-          await Promise.resolve()
-          restored.push('first:end')
-        }, 'first')
-        ctx.effect(() => async () => {
-          restored.push('second:start')
-          await Promise.resolve()
-          restored.push('second:end')
-        }, 'second')
+        ctx.effect(() => () => recover('first'), 'first')
+        ctx.effect(() => () => recover('second'), 'second')
       })
       const fiber = await root.plugin(Plugin)
       await fiber.dispose()
-      assert.deepEqual(restored, ['second:start', 'second:end', 'first:start', 'first:end'])
+      assert.deepEqual(restored, ['second:start', 'first:start', 'second:end', 'first:end'])
+      assert.equal(maximum, 2)
     },
   },
   {

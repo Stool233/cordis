@@ -23,12 +23,12 @@ Cordis clears `uid` at disposal request time. The paper O-Retire landing is emit
 
 The source observation manifest pins all current writes to `uid`, lifecycle, epoch/target, committed stores, runtime registry, and service stores. A new matching write fails `formal:check` until its paper observation or explicit refinement treatment is recorded.
 
-## Confirmed implementation deviations and regressions
+## Confirmed implementation deviations and refinement boundary
 
-Trace counterexamples identified three implementation-order deviations and the implementation was changed rather than weakening the paper properties:
+Trace counterexamples identified two implementation-order deviations and one important refinement boundary. The deviations were fixed rather than weakening the paper properties:
 
 1. Provider inverses could begin before asynchronous dependents finished unloading. Providers now join the dependent set before starting any inverse.
-2. Top-level disposer wrappers were started concurrently and a returned `ctx.effect()` wrapper could be counted twice. Top-level recovery is now serial LIFO; wrappers are refinement-only bookkeeping and their underlying cleanup is the resource.
+2. Each `ctx.effect()` iterator recovers its accumulated resources serially in LIFO order. Independent top-level structural wrappers start in reverse registration order and are joined concurrently, as Section 5.1.3 states; those wrappers are refinement-only bookkeeping and their underlying inverses are the modeled resources.
 3. Reload committed its store while the fiber still projected as Inactive, and an active target could change before L-Leave. Reload is deferred until the Reloading state lands, and L-Leave lands before exposing a differing target.
 
-The regression suite and four semantic mutations cover these failures. The mutations remove the unload guard, compare a replacement by service value instead of provider identity, restore FIFO, and retain a stale committed provider.
+The regression suite and four semantic mutations cover these obligations. The mutations remove the unload guard, compare a replacement by service value instead of provider identity, restore an iterator accumulator in FIFO order, and retain a stale committed provider.

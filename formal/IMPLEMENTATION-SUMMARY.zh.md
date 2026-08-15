@@ -103,7 +103,7 @@ Specula 在这里是方法和调试体验的参考：验证器采用确定性事
 轨迹比较确认了三个实现顺序问题。修复同时进入上游 Cordis 和 DeepSeek Harness 的 vendored Cordis：
 
 1. **Provider 恢复过早。** 原 `_unload()` 会并发启动所有顶层 disposer，导致 provider 自身 inverse 可能在异步 consumer 完成退出前开始。现在 provider 从 `ACTIVE` 离开时先记录并等待所有 dependent fibers 完成，再启动任何 provider inverse。
-2. **顶层恢复不满足完整 LIFO。** 原实现并发启动顶层 disposer；现在顶层 accumulator 严格串行、逆序恢复，generator 内部收集的 inverse 同样保持 LIFO。
+2. **恢复次序存在两个层次。** 每个 `ctx.effect()` iterator 内收集的 inverse 严格串行并按 LIFO 恢复；相互独立的顶层 structural wrapper 按注册逆序启动并并发 join，这与论文 Section 5.1.3 的实现说明一致。wrapper 只属于 refinement bookkeeping，真正进入抽象资源集合的是其内部 inverse。
 3. **生命周期与可见视图落地顺序不一致。** 原实现可能在 fiber 仍投影为 Inactive 时提交 store，或在 L-Leave 前暴露新 target。现在 `Reloading`/`Unloading` 生命周期先落地，再暴露相容的 target 或 committed view。
 
 另一个重要审计结论是：论文中的静态 provision `p` 不能直接等同于当前 `Plugin.provide` 元数据。该元数据尚未参与核心生命周期解析；真正的实现供给来自 `ctx.provide()` 产生的稳定 `(logical key, realm)` episode。因此，`TotalProvision` 只在 harness 完全控制 provider 的闭合场景中成立，不能推广到任意插件树。
@@ -117,7 +117,7 @@ Specula 在这里是方法和调试体验的参考：验证器采用确定性事
 - 相同值但不同 provider identity 的替换；
 - 依赖在异步 effect iteration 中丢失；
 - unloading 期间依赖恢复并在完成后重新加载；
-- generator 多段 inverse 和顶层 effect 的 LIFO 恢复；
+- generator 多段 inverse 的 LIFO 恢复，以及独立顶层 effect 的逆序启动与并发 join；
 - 部分安装抛错后的完整 rollback，且兄弟 fiber 不受影响；
 - 父级动态注册子级及级联退休；
 - 同一逻辑 key 在不同 isolation realm 中独立解析；

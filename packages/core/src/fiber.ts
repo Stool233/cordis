@@ -502,7 +502,8 @@ export class Fiber {
     if (this.inertia) return
     if (beginsReload) {
       this._updateState(() => {
-        this.inertia = Promise.resolve().then(() => this._reload())
+        const epoch = this._runner.epoch
+        this.inertia = Promise.resolve().then(() => this._reload(epoch))
         return FiberState.LOADING
       })
     } else {
@@ -512,7 +513,7 @@ export class Fiber {
     }
   }
 
-  private async _reload() {
+  private async _reload(oldEpoch: string) {
     const previous: Impl[] = this.store ? Object.values(this.store) : []
     this.store = { ...this._store }
     emitCordisPaperTrace(this.ctx, {
@@ -521,10 +522,13 @@ export class Fiber {
       previous,
       current: Object.values(this.store),
     })
-    const oldEpoch = this._runner.epoch
     try {
       await Promise.resolve()
-      await this._execute(this._runner)
+      // A disposer queued before this checkpoint may already have invalidated
+      // the load. Do not execute plugin code for a stale lifecycle epoch.
+      if (this._runner.epoch === oldEpoch) {
+        await this._execute(this._runner)
+      }
     } catch (reason) {
       // impl guarantees that the error is non-null (?)
       this.ctx.logger.error(reason)
@@ -544,8 +548,10 @@ export class Fiber {
   private async _unload() {
     const dependents = [...this._pendingDependents]
     this._pendingDependents.clear()
-    await Promise.allSettled(dependents.map(fiber => fiber.await()))
-    for (const dispose of this._disposables.clear()) {
+    if (dependents.length) {
+      await Promise.allSettled(dependents.map(fiber => fiber.await()))
+    }
+    await Promise.all(this._disposables.clear().map(async (dispose) => {
       try {
         await composeError(async (info) => {
           await Promise.resolve()
@@ -555,7 +561,7 @@ export class Fiber {
       } catch (reason) {
         this.ctx.logger.error(reason)
       }
-    }
+    }))
     const previous: Impl[] = this.store ? Object.values(this.store) : []
     this.store = undefined
     emitCordisPaperTrace(this.ctx, {
@@ -568,7 +574,8 @@ export class Fiber {
       if (this._runner.epoch === INACTIVE) {
         this.inertia = undefined
       } else {
-        this.inertia = Promise.resolve().then(() => this._reload())
+        const epoch = this._runner.epoch
+        this.inertia = Promise.resolve().then(() => this._reload(epoch))
         return FiberState.LOADING
       }
     })
