@@ -4,11 +4,13 @@ import { pathToFileURL } from 'node:url'
 import assert from 'node:assert/strict'
 import { CordisPaperTraceRecorder, type TraceImplementation } from './recorder.ts'
 import { allAssumptions, canonicalState, preconditionScenarios, scenarios as coreScenarios, type CordisImplementation, type ScenarioDefinition } from './scenarios.ts'
+import { evidenceReference } from '../tools/report-paths.mjs'
 
 interface Options {
   implementationRoot: string
   output: string
   implementationName: string
+  implementationRole: string
   revision: string
   scenarioModule?: string
 }
@@ -23,6 +25,7 @@ function parseArgs(argv: string[]): Options {
     implementationRoot: resolve(value('--implementation-root') ?? join(repository, 'packages/core')),
     output: resolve(value('--output') ?? join(repository, 'formal/output/traces')),
     implementationName: value('--implementation-name') ?? 'cordis',
+    implementationRole: value('--implementation-role') ?? 'upstream',
     revision: value('--revision') ?? 'working-tree',
     scenarioModule: value('--scenario-module') ? resolve(value('--scenario-module')!) : undefined,
   }
@@ -126,7 +129,7 @@ async function main() {
 
   const report: any = {
     schema: 'cordis.paper-conformance-report/v1',
-    implementation,
+    generatedFrom: { ...implementation, role: options.implementationRole },
     generatedBy: basename(import.meta.url),
     scenarios: [],
     prerequisites: preconditionScenarios.map(item => ({
@@ -144,7 +147,7 @@ async function main() {
     await writeFile(file, first.encode())
     report.scenarios.push({
       name: definition.name,
-      trace: file,
+      trace: evidenceReference(dirname(options.output), file),
       events: first.lines.length,
       assumptions: definition.assumptions,
       properties: propertyStatuses(definition),
@@ -159,7 +162,7 @@ async function main() {
     await writeFile(file, result.recorder.encode())
     report.scenarios.push({
       name: result.definition.name,
-      trace: file,
+      trace: evidenceReference(dirname(options.output), file),
       events: result.recorder.lines.length,
       assumptions: result.definition.assumptions,
       properties: { Confluence: 'pending-trace-validation' },

@@ -3,9 +3,11 @@
 import assert from 'node:assert/strict'
 import { spawn } from 'node:child_process'
 import { createHash } from 'node:crypto'
-import { access, mkdir, readFile, readdir, rename, rm, writeFile } from 'node:fs/promises'
-import { dirname, join, relative, resolve } from 'node:path'
+import { access, cp, mkdir, mkdtemp, readFile, readdir, rename, rm, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { absolutePathAt, evidenceReference, portableCommand, resolveEvidenceReference } from './report-paths.mjs'
 
 const repository = resolve(dirname(fileURLToPath(import.meta.url)), '../..')
 const formalRoot = join(repository, 'formal')
@@ -23,8 +25,8 @@ const artifacts = [
   {
     name: 'TLA+ CommunityModules',
     env: 'CORDIS_TLA_COMMUNITY_JAR',
-    file: 'CommunityModules-202505152026.jar',
-    url: 'https://repo1.maven.org/maven2/org/lamport/tla/community-modules/202505152026/community-modules-202505152026.jar',
+    file: 'CommunityModules-deps-202505152026.jar',
+    url: 'https://github.com/tlaplus/CommunityModules/releases/download/202505152026/CommunityModules-deps-202505152026.jar',
     sha256: '044e8ecdfbca92d51d7eb4469422c2a7da1fe25dc8ad39c4a90e6622d6da4d99',
   },
 ]
@@ -103,7 +105,7 @@ async function ensureArtifact(artifact, cacheRoot) {
 async function toolchain() {
   const cacheRoot = resolve(flag('--cache', process.env.CORDIS_TLA_CACHE || defaultCache))
   const [tools, community] = await Promise.all(artifacts.map(artifact => ensureArtifact(artifact, cacheRoot)))
-  return { tools, community, classpath: `${tools}:${community}` }
+  return { tools, community, cacheRoot, classpath: `${tools}:${community}` }
 }
 
 function run(command, args, options = {}) {
@@ -162,14 +164,23 @@ function failureDetails(output, extra = {}) {
   return { theorem, action, traceLine: traceLine ? Number(traceLine) : null, ...extra }
 }
 
-async function writeFailure(path, result, extra = {}) {
+function evidenceRoots(tool, outputRoot, implementationRoot = resolve(flag('--implementation-root', join(repository, 'packages/core')))) {
+  return {
+    OUTPUT: resolve(outputRoot),
+    FORMAL_ROOT: formalRoot,
+    IMPLEMENTATION_ROOT: resolve(implementationRoot),
+    TOOL_CACHE: [tool.cacheRoot, dirname(tool.tools), dirname(tool.community)],
+  }
+}
+
+async function writeFailure(path, result, extra = {}, roots = {}) {
   await mkdir(dirname(path), { recursive: true })
   await writeFile(path, JSON.stringify({
     schema: 'cordis.paper-failure/v1',
     ...failureDetails(`${result.stdout}\n${result.stderr}`, extra),
     exitCode: result.code,
     timedOut: result.timedOut,
-    command: [result.command, ...result.args],
+    command: portableCommand([result.command, ...result.args], roots),
   }, null, 2) + '\n')
 }
 
@@ -227,14 +238,19 @@ async function model(profile = 'pr') {
       }
     } catch (error) {
       if (!(error instanceof CommandFailure)) throw error
-      await writeFailure(join(outputRoot, 'failures', `${label}.json`), error.result, { model: entry.module, config: entry.config })
+      const failure = join(outputRoot, 'failures', `${label}.json`)
+      await writeFailure(failure, error.result, { model: entry.module, config: entry.config }, evidenceRoots(tool, outputRoot))
       results.push({ name: label, status: 'fail', properties: Object.fromEntries(entry.properties.map(property => [property, 'fail'])), ...modelStats(error.result.stdout) })
-      await writeFile(join(outputRoot, 'model-report.json'), JSON.stringify({ schema: 'cordis.paper-model-report/v1', profile, results }, null, 2) + '\n')
+      const report = join(outputRoot, 'model-report.json')
+      await writeFile(report, JSON.stringify({ schema: 'cordis.paper-model-report/v1', profile, results }, null, 2) + '\n')
+      await assertPortableFiles(outputRoot, [failure, report])
       throw error
     }
   }
   await mkdir(outputRoot, { recursive: true })
-  await writeFile(join(outputRoot, 'model-report.json'), JSON.stringify({ schema: 'cordis.paper-model-report/v1', profile, results }, null, 2) + '\n')
+  const report = join(outputRoot, 'model-report.json')
+  await writeFile(report, JSON.stringify({ schema: 'cordis.paper-model-report/v1', profile, results }, null, 2) + '\n')
+  await assertPortableFiles(outputRoot, [report])
 }
 
 async function revision() {
@@ -242,39 +258,88 @@ async function revision() {
   return result.stdout.trim()
 }
 
-async function generateTraces(outputRoot) {
-  const traceRoot = join(outputRoot, 'traces')
-  await rm(traceRoot, { recursive: true, force: true })
-  const implementationRoot = resolve(flag('--implementation-root', join(repository, 'packages/core')))
-  const implementationName = flag('--implementation-name', 'cordis')
-  const implementationRevision = flag('--revision', await revision())
+async function runTraceGenerator(traceRoot, options) {
   const generatorArgs = [
     'yarn', 'tsx', join(formalRoot, 'harness/generate.ts'),
     '--repository', repository,
-    '--implementation-root', implementationRoot,
+    '--implementation-root', options.implementationRoot,
     '--output', traceRoot,
-    '--implementation-name', implementationName,
-    '--revision', implementationRevision,
+    '--implementation-name', options.implementationName,
+    '--implementation-role', options.implementationRole,
+    '--revision', options.implementationRevision,
   ]
-  const scenarioModule = flag('--scenario-module')
-  if (scenarioModule) generatorArgs.push('--scenario-module', resolve(scenarioModule))
-  const traceRuntimeRoot = resolve(flag('--trace-runtime-root', repository))
-  if (traceRuntimeRoot === repository) {
+  if (options.scenarioModule) generatorArgs.push('--scenario-module', options.scenarioModule)
+  if (options.traceRuntimeRoot === repository) {
     await run('corepack', generatorArgs, { timeoutMs: 5 * 60 * 1_000 })
   } else {
-    const executor = join(traceRuntimeRoot, 'node_modules/.bin/tsx')
+    const executor = join(options.traceRuntimeRoot, 'node_modules/.bin/tsx')
     await access(executor).catch(() => {
       throw new Error(`trace runtime has no tsx executable: ${executor}`)
     })
     await run(executor, [
-      '--tsconfig', join(traceRuntimeRoot, 'tsconfig.json'),
+      '--tsconfig', join(options.traceRuntimeRoot, 'tsconfig.json'),
       ...generatorArgs.slice(2),
     ], {
-      cwd: traceRuntimeRoot,
+      cwd: options.traceRuntimeRoot,
       timeoutMs: 5 * 60 * 1_000,
     })
   }
-  return { traceRoot, implementationRoot, implementationName, implementationRevision }
+}
+
+async function treeFiles(root, directory = root) {
+  const result = []
+  for (const entry of await readdir(directory, { withFileTypes: true })) {
+    const path = join(directory, entry.name)
+    if (entry.isDirectory()) result.push(...await treeFiles(root, path))
+    else if (entry.isFile()) result.push(evidenceReference(root, path))
+  }
+  return result.sort()
+}
+
+async function assertByteIdentical(leftRoot, rightRoot) {
+  const leftFiles = await treeFiles(leftRoot)
+  const rightFiles = await treeFiles(rightRoot)
+  assert.deepEqual(rightFiles, leftFiles, 'portable evidence generation produced different file sets')
+  for (const reference of leftFiles) {
+    const [left, right] = await Promise.all([
+      readFile(resolveEvidenceReference(leftRoot, reference)),
+      readFile(resolveEvidenceReference(rightRoot, reference)),
+    ])
+    assert.ok(left.equals(right), `${reference} differs across temporary evidence roots`)
+  }
+}
+
+async function generateTraces(outputRoot) {
+  const traceRoot = join(outputRoot, 'traces')
+  const options = {
+    implementationRoot: resolve(flag('--implementation-root', join(repository, 'packages/core'))),
+    implementationName: flag('--implementation-name', 'cordis'),
+    implementationRole: flag('--implementation-role', 'upstream'),
+    implementationRevision: flag('--revision', await revision()),
+    scenarioModule: flag('--scenario-module') ? resolve(flag('--scenario-module')) : undefined,
+    traceRuntimeRoot: resolve(flag('--trace-runtime-root', repository)),
+  }
+  const leftRoot = await mkdtemp(join(tmpdir(), 'cordis-formal-evidence-left-'))
+  const rightRoot = await mkdtemp(join(tmpdir(), 'cordis-formal-evidence-right-'))
+  try {
+    await Promise.all([
+      runTraceGenerator(join(leftRoot, 'traces'), options),
+      runTraceGenerator(join(rightRoot, 'traces'), options),
+    ])
+    await assertByteIdentical(leftRoot, rightRoot)
+    await mkdir(outputRoot, { recursive: true })
+    await rm(traceRoot, { recursive: true, force: true })
+    await rm(join(outputRoot, 'generation-report.json'), { force: true })
+    await cp(join(leftRoot, 'traces'), traceRoot, { recursive: true })
+    await cp(join(leftRoot, 'generation-report.json'), join(outputRoot, 'generation-report.json'))
+  } finally {
+    await Promise.all([
+      rm(leftRoot, { recursive: true, force: true }),
+      rm(rightRoot, { recursive: true, force: true }),
+    ])
+  }
+  const report = JSON.parse(await readFile(join(outputRoot, 'generation-report.json'), 'utf8'))
+  return { implementationRoot: options.implementationRoot, generatedFrom: report.generatedFrom }
 }
 
 async function validateTrace(tool, path, outputRoot, options = {}) {
@@ -296,13 +361,15 @@ async function trace() {
   await mkdir(outputRoot, { recursive: true })
   const generated = await generateTraces(outputRoot)
   const generationReportPath = join(outputRoot, 'generation-report.json')
+  const conformanceReportPath = join(outputRoot, 'conformance-report.json')
   const report = JSON.parse(await readFile(generationReportPath, 'utf8'))
   assert.ok(report.scenarios.length > 0, 'no core trace scenarios were generated')
   for (const scenario of report.scenarios) {
-    const content = await readFile(scenario.trace, 'utf8')
+    const tracePath = resolveEvidenceReference(outputRoot, scenario.trace)
+    const content = await readFile(tracePath, 'utf8')
     assert.ok(content.trim(), `${scenario.name} generated an empty trace`)
     try {
-      const result = await validateTrace(tool, scenario.trace, outputRoot, { quiet: hasFlag('--quiet') })
+      const result = await validateTrace(tool, tracePath, outputRoot, { quiet: hasFlag('--quiet') })
       scenario.traceMatched = 'pass'
       scenario.tlc = modelStats(result.stdout)
       for (const property of Object.keys(scenario.properties)) scenario.properties[property] = 'pass'
@@ -310,11 +377,13 @@ async function trace() {
       if (!(error instanceof CommandFailure)) throw error
       scenario.traceMatched = 'fail'
       for (const property of Object.keys(scenario.properties)) scenario.properties[property] = 'fail'
-      await writeFailure(join(outputRoot, 'failures', `trace-${scenario.name}.json`), error.result, {
-        trace: relative(repository, scenario.trace),
-        implementation: report.implementation,
-      })
-      await writeFile(join(outputRoot, 'conformance-report.json'), JSON.stringify(report, null, 2) + '\n')
+      const failure = join(outputRoot, 'failures', `trace-${scenario.name}.json`)
+      await writeFailure(failure, error.result, {
+        trace: scenario.trace,
+        implementation: report.generatedFrom,
+      }, evidenceRoots(tool, outputRoot, generated.implementationRoot))
+      await writeFile(conformanceReportPath, JSON.stringify(report, null, 2) + '\n')
+      await assertPortableFiles(outputRoot, [generationReportPath, conformanceReportPath, failure])
       throw error
     }
   }
@@ -323,8 +392,9 @@ async function trace() {
     assert.ok(Object.values(scenario.properties).every(status => status === 'pass'), `${scenario.name} has a required property without evidence`)
   }
   report.traceMatched = 'pass'
-  report.generatedFrom = generated
-  await writeFile(join(outputRoot, 'conformance-report.json'), JSON.stringify(report, null, 2) + '\n')
+  assert.deepEqual(report.generatedFrom, generated.generatedFrom, 'trace generator provenance changed while copying portable evidence')
+  await writeFile(conformanceReportPath, JSON.stringify(report, null, 2) + '\n')
+  await assertPortableFiles(outputRoot, [generationReportPath, conformanceReportPath, ...report.scenarios.map(scenario => resolveEvidenceReference(outputRoot, scenario.trace))])
 }
 
 function cloneLines(lines) {
@@ -396,6 +466,32 @@ async function writeTrace(path, lines) {
   await writeFile(path, lines.map(line => JSON.stringify(line)).join('\n') + '\n')
 }
 
+async function evidenceValue(path) {
+  const content = await readFile(path, 'utf8')
+  if (path.endsWith('.ndjson')) return content.trim().split('\n').filter(Boolean).map(line => JSON.parse(line))
+  return JSON.parse(content)
+}
+
+async function assertPortableFiles(outputRoot, paths) {
+  for (const path of paths) {
+    evidenceReference(outputRoot, path)
+    const found = absolutePathAt(await evidenceValue(path))
+    assert.equal(found, null, `${evidenceReference(outputRoot, path)} contains an absolute path at ${found}`)
+  }
+}
+
+async function evidence(outputRoot = resolve(flag('--output', defaultOutput))) {
+  const paths = (await treeFiles(outputRoot))
+    .filter(reference => reference.endsWith('.json') || reference.endsWith('.ndjson'))
+    .map(reference => resolveEvidenceReference(outputRoot, reference))
+  assert.ok(paths.length > 0, `no evidence files found under ${outputRoot}`)
+  await assertPortableFiles(outputRoot, paths)
+}
+
+async function portable() {
+  await run(process.execPath, ['--test', join(formalRoot, 'tools/report-paths.test.mjs')])
+}
+
 async function mutation() {
   const tool = await toolchain()
   const outputRoot = resolve(flag('--output', defaultOutput))
@@ -422,11 +518,20 @@ async function mutation() {
     const output = `${result.stdout}\n${result.stderr}`
     const rejected = result.code !== 0 && /Invariant .*violated|Temporal propert(?:y .* was|ies were) violated|is violated by the initial state|Deadlock reached/i.test(output)
     if (!rejected) throw new Error(`${definition.name} mutant was not rejected by semantic model checking`)
-    await writeFailure(join(outputRoot, 'failures', `mutation-${definition.name}.json`), result, { mutation: definition.name, trace: relative(repository, path) })
-    results.push({ name: definition.name, status: 'rejected', trace: path, ...failureDetails(output) })
+    const trace = evidenceReference(outputRoot, path)
+    await writeFailure(join(outputRoot, 'failures', `mutation-${definition.name}.json`), result, { mutation: definition.name, trace }, evidenceRoots(tool, outputRoot))
+    results.push({ name: definition.name, status: 'rejected', trace, ...failureDetails(output) })
     process.stdout.write(`mutation ${definition.name}: rejected\n`)
   }
-  await writeFile(join(outputRoot, 'mutation-report.json'), JSON.stringify({ schema: 'cordis.paper-mutation-report/v1', results }, null, 2) + '\n')
+  const report = join(outputRoot, 'mutation-report.json')
+  await writeFile(report, JSON.stringify({ schema: 'cordis.paper-mutation-report/v1', results }, null, 2) + '\n')
+  await assertPortableFiles(outputRoot, [
+    report,
+    ...definitions.flatMap(definition => [
+      join(mutationRoot, `${definition.name}.ndjson`),
+      join(outputRoot, 'failures', `mutation-${definition.name}.json`),
+    ]),
+  ])
 }
 
 async function observation() {
@@ -434,30 +539,36 @@ async function observation() {
 }
 
 async function check() {
+  await portable()
   await syntax()
   await model('pr')
   await observation()
   await trace()
   await mutation()
+  await evidence()
 }
 
 async function main() {
   const command = process.argv[2] ?? 'check'
   if (hasFlag('--help') || command === 'help') {
-    process.stdout.write('usage: node formal/tools/run.mjs <syntax|model|trace|mutation|check|nightly> [--implementation-root path] [--scenario-module path] [--trace-runtime-root path] [options]\n')
+    process.stdout.write('usage: node formal/tools/run.mjs <syntax|model|trace|mutation|portable|evidence|check|nightly> [--implementation-root path] [--scenario-module path] [--trace-runtime-root path] [options]\n')
     return
   }
   if (command === 'syntax') return syntax()
   if (command === 'model') return model(flag('--profile', 'pr'))
   if (command === 'trace') return trace()
   if (command === 'mutation') return mutation()
+  if (command === 'portable') return portable()
+  if (command === 'evidence') return evidence()
   if (command === 'check') return check()
   if (command === 'nightly') {
+    await portable()
     await syntax()
     await model('nightly')
     await observation()
     await trace()
     await mutation()
+    await evidence()
     return
   }
   throw new Error(`unknown formal command: ${command}`)

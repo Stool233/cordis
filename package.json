@@ -18,6 +18,8 @@
     "formal:model": "node formal/tools/run.mjs model",
     "formal:trace": "node formal/tools/run.mjs trace",
     "formal:mutation": "node formal/tools/run.mjs mutation",
+    "formal:portable": "node formal/tools/run.mjs portable",
+    "formal:evidence": "node formal/tools/run.mjs evidence",
     "formal:check": "node formal/tools/run.mjs check",
     "formal:nightly": "node formal/tools/run.mjs nightly",
     "test:text": "shx rm -rf coverage && yarn test --coverage --coverage.reporter text",

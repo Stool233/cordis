@@ -13,6 +13,8 @@ yarn formal:syntax
 yarn formal:model
 yarn formal:trace
 yarn formal:mutation
+yarn formal:portable
+yarn formal:evidence
 yarn formal:check
 ```
 
@@ -26,6 +28,7 @@ To validate another source-compatible Cordis checkout against this kit:
 yarn formal:trace \
   --implementation-root /path/to/cordis/package \
   --implementation-name implementation-name \
+  --implementation-role upstream \
   --revision implementation-revision
 ```
 
@@ -42,8 +45,14 @@ When the implementation uses a different workspace's source aliases, pass `--tra
 - [`CordisTrace.tla`](CordisTrace.tla) consumes every NDJSON line with a cursor and compares the complete abstract post-state. Its only silent action is a bounded launch immediately associated with the next iteration landing or raise.
 - [`observation-points.json`](observation-points.json) and `tools/verify-observation.mjs` reject new lifecycle, epoch, target, committed-store, uid, registry, or service-store writes until an observation mapping is declared.
 
-The generator runs every implementation scenario twice and requires byte-identical traces. Every core scenario must be non-empty, fully consumed by `TraceMatched`, and have only `pass` property results. Deliberate prerequisite failures remain `not-applicable`; they are never promoted to passes.
+The runner invokes the generator under two distinct temporary roots and requires the complete generated file trees to be byte-identical before copying one tree to the requested output root. Every core scenario must be non-empty, fully consumed by `TraceMatched`, and have only `pass` property results. Deliberate prerequisite failures remain `not-applicable`; they are never promoted to passes.
 
 Failures are retained under `formal/output/`: the source NDJSON, TLC JSON counterexample, theorem/action/trace-line metadata, model report, conformance report, and mutation report. The output directory is ignored by Git.
+
+## Portable report v1 paths
+
+Every file reference in a `cordis.paper-*-report/v1` or `cordis.paper-failure/v1` document is a non-empty POSIX path relative to the evidence output root. The output root is the directory containing `generation-report.json`, `conformance-report.json`, `model-report.json`, and `mutation-report.json`; nested failure documents use that same root. Consumers must reject absolute paths, backslashes, and references that escape through `..` before resolving a file.
+
+`generatedFrom` contains only the implementation name, package version, full revision, and logical role. Failure commands replace machine-local roots with `${OUTPUT}`, `${FORMAL_ROOT}`, `${IMPLEMENTATION_ROOT}`, and `${TOOL_CACHE}`. `formal:portable` tests the serializer and resolver, while `formal:evidence` rejects Unix, macOS, or Windows absolute paths anywhere in generated JSON or NDJSON evidence.
 
 See [`THEOREMS.md`](THEOREMS.md) for the paper-to-code index, [`PREMISES.md`](PREMISES.md) for applicability audits, and [`specula-guidance.md`](specula-guidance.md) for optional interactive debugging.

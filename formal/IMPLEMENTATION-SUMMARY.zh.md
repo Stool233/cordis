@@ -162,17 +162,17 @@ Preservation、RecoveryExactness、Ordering、ResolutionCoherence、Progress、R
 | 改为 FIFO 恢复 | 违反 accumulator 的逆序恢复性质 |
 | 保留 stale committed provider | 已失效 provider 仍会出现在 committed view |
 
-失败证据包含 NDJSON、TLC JSON counterexample、定理、动作、轨迹行号和版本信息，保存在忽略提交的 `formal/output/` 中。
+失败证据包含 NDJSON、TLC JSON counterexample、定理、动作、轨迹行号和版本信息，保存在忽略提交的 `formal/output/` 中。报告中的文件引用统一采用相对于 evidence output root 的 POSIX 路径，失败命令中的本机目录则替换为 `${OUTPUT}`、`${FORMAL_ROOT}`、`${IMPLEMENTATION_ROOT}` 和 `${TOOL_CACHE}`。runner 会在两个不同的临时根生成完整轨迹树并逐字节比较，随后才把一份复制到目标目录。
 
 ## 三个仓库分别做了什么
 
 | 仓库 | 本地分支 | 关键提交 | 内容 |
 | --- | --- | --- | --- |
-| `cordiverse/cordis` | `codex/tla-conformance` | `ce854b593eae4d2ca6717945f26b85eb5f1ee264` | 权威 TLA+ 规格、trace recorder/runner、CI、源码观察门禁、运行时修复和回归测试。 |
-| `deepseek-ai/deepseek-harness` | `codex/cordis-tla-conformance` | `f9df688cf1a6cd56efe518166f51d29cc8a029f6` | backport 内部 hook 和运行时修复，运行同一 conformance kit，增加 vendored 与 AgentLoop 场景、CI 和 Agent Note。 |
-| `cordiverse/paper` | `codex/tla-formalization-link` | `c3a7750a72ee6f6e5616195e722e9c3d2fed7e64` | 从论文 `origin/main` 建独立分支，只在 README 链接权威规格；中文翻译分支未修改。 |
+| `Stool233/cordis` | `research/cordis-formal-study` | 由研究门户 lock 固定 | 权威 TLA+ 规格、trace recorder/runner、可移植证据、CI、源码观察门禁、运行时修复和回归测试。 |
+| `Stool233/deepseek-harness` | `research/cordis-formal-study` | 由研究门户 lock 固定 | backport 内部 hook 和运行时修复，运行同一 conformance kit，增加 vendored 与 AgentLoop 场景、CI 和 Agent Note。 |
+| `cordiverse/paper` | `main` | `948a07b369c62adb3b12e102458be5c18dfb69b9` | 仅引用上游英文论文；本地中文翻译和 formal-link 分支不公开。 |
 
-这些分支目前只存在于本地。DeepSeek Harness CI 固定检出上表中的 Cordis 关键提交，因此发布顺序应为：先 push Cordis，再 push DeepSeek Harness，最后 push paper。
+公开研究门户 `Stool233/cordis-formal-study` 通过 submodule gitlink 与 `study.lock.json` 同时固定这三个来源。DeepSeek Harness CI 固定检出门户 lock 中的 Cordis 提交；上游 `origin` 保持不变，研究分支只推送到个人 fork。
 
 ## 如何复跑
 
@@ -183,6 +183,8 @@ yarn formal:syntax
 yarn formal:model
 yarn formal:trace
 yarn formal:mutation
+yarn formal:portable
+yarn formal:evidence
 yarn formal:check
 ```
 

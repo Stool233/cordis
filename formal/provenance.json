@@ -9,7 +9,7 @@
   "cordis": {
     "repository": "https://github.com/cordiverse/cordis",
     "baseline": "8cc9e33fab69e2d0476d126baaf2acb24e6a6ab4",
-    "formalBranch": "codex/tla-conformance"
+    "formalBranch": "research/cordis-formal-study"
   },
   "deepseekHarness": {
     "repository": "https://github.com/deepseek-ai/deepseek-harness",
