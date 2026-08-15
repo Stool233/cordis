@@ -1,0 +1,47 @@
+name: Paper conformance
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/formal.yml'
+      - 'formal/**'
+      - 'packages/core/**'
+      - 'package.json'
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/formal.yml'
+      - 'formal/**'
+      - 'packages/core/**'
+      - 'package.json'
+
+jobs:
+  conformance:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Check out
+        uses: actions/checkout@v6
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+      - name: Setup Java
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 21
+      - name: Enable Corepack
+        run: corepack enable
+      - name: Install
+        run: yarn --no-immutable
+      - name: Check paper conformance
+        run: yarn formal:check --quiet
+      - name: Upload conformance evidence
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: cordis-paper-conformance
+          path: formal/output/
+          if-no-files-found: error

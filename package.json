@@ -14,6 +14,12 @@
     "yakumo": "node --expose-internals --import tsx --import @cordisjs/unyaml node_modules/yakumo/lib/cli.js",
     "build": "yarn yakumo esbuild && yarn yakumo tsc",
     "test": "yarn yakumo vitest --import tsx",
+    "formal:syntax": "node formal/tools/run.mjs syntax",
+    "formal:model": "node formal/tools/run.mjs model",
+    "formal:trace": "node formal/tools/run.mjs trace",
+    "formal:mutation": "node formal/tools/run.mjs mutation",
+    "formal:check": "node formal/tools/run.mjs check",
+    "formal:nightly": "node formal/tools/run.mjs nightly",
     "test:text": "shx rm -rf coverage && yarn test --coverage --coverage.reporter text",
     "test:json": "shx rm -rf coverage && yarn test --coverage --coverage.reporter json",
     "test:html": "shx rm -rf coverage && yarn test --coverage --coverage.reporter html"

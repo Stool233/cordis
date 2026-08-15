@@ -2,6 +2,7 @@ import { defineProperty, Dict, isNullable } from 'cosmokit'
 import { Context } from './context'
 import { getTraceable, symbols, withProps } from './utils'
 import { Fiber, FiberState } from './fiber'
+import { emitCordisPaperTrace } from './formal-trace'
 
 declare module './context' {
   interface Context {
@@ -189,15 +190,33 @@ export class ReflectService {
       }
       this.store[key] = impl
       this.ctx.fiber.store![name] = impl
+      emitCordisPaperTrace(this.ctx, {
+        kind: 'service-provided',
+        fiber: this.ctx.fiber,
+        implementation: impl,
+        realm: key,
+      })
       if (this.ctx.fiber.state === FiberState.ACTIVE) {
         this.notify([name])
       }
       return async () => {
+        emitCordisPaperTrace(this.ctx, {
+          kind: 'service-withdrawing',
+          fiber: this.ctx.fiber,
+          implementation: impl,
+          realm: key,
+        })
         delete this.store[key]
         const fibers = this.notify([name])
         await Promise.allSettled(fibers.map(fiber => fiber.await()))
         // ensure self access before dependencies cleanup
         delete this.ctx.fiber.store![name]
+        emitCordisPaperTrace(this.ctx, {
+          kind: 'service-withdrawn',
+          fiber: this.ctx.fiber,
+          implementation: impl,
+          realm: key,
+        })
       }
     }, `ctx.provide(${JSON.stringify(name)})`)
   }

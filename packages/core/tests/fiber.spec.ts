@@ -62,6 +62,61 @@ describe('Fiber', () => {
     expect(fiber.state).to.equal(FiberState.PENDING)
   }))
 
+  it('keeps provider resources until asynchronous consumers finish unloading', async () => {
+    const root = new Context()
+    const resource = { available: true }
+    const observations: boolean[] = []
+
+    const provider = await root.plugin((ctx) => {
+      ctx.provide('resource', resource)
+      ctx.effect(() => () => {
+        resource.available = false
+      }, 'provider resource')
+    })
+    const consumer = await root.plugin({
+      inject: ['resource'],
+      apply(ctx) {
+        void (ctx as any).resource
+        return async () => {
+          await Promise.resolve()
+          observations.push(resource.available)
+        }
+      },
+    })
+
+    await provider.dispose()
+
+    expect(observations).to.deep.equal([true])
+    expect(resource.available).to.equal(false)
+    expect(consumer.state).to.equal(FiberState.PENDING)
+  })
+
+  it('restores top-level effects serially in reverse order', async () => {
+    const root = new Context()
+    const order: string[] = []
+    const fiber = await root.plugin((ctx) => {
+      ctx.effect(() => async () => {
+        order.push('first:start')
+        await Promise.resolve()
+        order.push('first:end')
+      }, 'first')
+      ctx.effect(() => async () => {
+        order.push('second:start')
+        await Promise.resolve()
+        order.push('second:end')
+      }, 'second')
+    })
+
+    await fiber.dispose()
+
+    expect(order).to.deep.equal([
+      'second:start',
+      'second:end',
+      'first:start',
+      'first:end',
+    ])
+  })
+
   it('plugin error', async () => {
     const root = new Context()
     const callback = mock.fn()

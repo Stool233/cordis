@@ -1,0 +1,37 @@
+name: Paper conformance nightly
+
+on:
+  schedule:
+    - cron: '23 17 * * *'
+  workflow_dispatch:
+
+jobs:
+  conformance:
+    runs-on: ubuntu-latest
+    timeout-minutes: 155
+
+    steps:
+      - name: Check out
+        uses: actions/checkout@v6
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+      - name: Setup Java
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 21
+      - name: Enable Corepack
+        run: corepack enable
+      - name: Install
+        run: yarn --no-immutable
+      - name: Run expanded paper models and traces
+        run: yarn formal:nightly --quiet
+      - name: Upload conformance evidence
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: cordis-paper-conformance-nightly
+          path: formal/output/
+          if-no-files-found: error

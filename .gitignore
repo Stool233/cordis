@@ -26,6 +26,9 @@ tsconfig.temp.json
 tsconfig.tsbuildinfo
 report.*.json
 
+/formal/.cache/
+/formal/output/
+
 .claude
 .eslintcache
 .DS_Store
