@@ -4,6 +4,8 @@ This directory is the authoritative executable specification for the Cordis pape
 
 The result is evidence for the revisions and finite configurations in [`provenance.json`](provenance.json). It is not an unconditional proof about arbitrary JavaScript plugins or their external side effects.
 
+For a Chinese overview of the implementation, evidence, fixes, and interpretation boundaries, see [`IMPLEMENTATION-SUMMARY.zh.md`](IMPLEMENTATION-SUMMARY.zh.md).
+
 ## Commands
 
 ```sh
