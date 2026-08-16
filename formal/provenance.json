@@ -1,0 +1,56 @@
+{
+  "schema": "cordis.paper-provenance/v1",
+  "paper": {
+    "repository": "https://github.com/cordiverse/paper",
+    "commit": "948a07b369c62adb3b12e102458be5c18dfb69b9",
+    "pdf": "paper.pdf",
+    "sha256": "4d48478dc0b6222d9f74d7db10ee776449b1209eb112632336544d32a49db97f"
+  },
+  "cordis": {
+    "repository": "https://github.com/cordiverse/cordis",
+    "baseline": "8cc9e33fab69e2d0476d126baaf2acb24e6a6ab4",
+    "formalBranch": "research/paper-trace-baseline",
+    "runtimeLogic": "unmodified from baseline"
+  },
+  "deepseekHarness": {
+    "repository": "https://github.com/deepseek-ai/deepseek-harness",
+    "baseline": "47f943859bef60e4160492346772ded9b24f765a",
+    "vendoredCordisBaseline": "56b3d4f725681cf4556c1a8695a709cc3b6eed74",
+    "vendoredCordisHasLocalModifications": true
+  },
+  "specula": {
+    "repository": "https://github.com/specula-org/Specula",
+    "commit": "c6aa3dfa41cd4bc7411fae40bd040924c70d9725",
+    "version": "1.1.0",
+    "role": "optional debugging guidance only"
+  },
+  "toolchain": {
+    "tlaTools": {
+      "version": "1.8.0",
+      "sha256": "ab323b79802aedc3203b3f9af37c6aca3ed43f4e0225b36f2aa77b26de46c05f"
+    },
+    "communityModules": {
+      "version": "202505152026",
+      "sha256": "044e8ecdfbca92d51d7eb4469422c2a7da1fe25dc8ad39c4a90e6622d6da4d99"
+    }
+  },
+  "profiles": {
+    "pullRequest": {
+      "fibers": 3,
+      "bindings": 2,
+      "maxIterations": 2,
+      "registrationDepth": 1,
+      "failureModes": [true, false],
+      "search": "BFS"
+    },
+    "nightly": {
+      "fibers": 5,
+      "bindings": 3,
+      "maxIterations": 3,
+      "registrationDepth": 2,
+      "timeoutMinutesPerModel": 30,
+      "search": "BFS with simulation supplement when diameter is below 10"
+    }
+  },
+  "boundary": "Evidence applies to these revisions, bounded models, declared prerequisites, and captured traces. It is not an unconditional mathematical proof of arbitrary JavaScript plugin side effects."
+}

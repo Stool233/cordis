@@ -1,0 +1,40 @@
+{
+  "schema": "cordis.paper-observation-points/v1",
+  "entries": [
+    { "file": "packages/core/src/fiber.ts", "category": "lifecycle", "source": "public state = FiberState.PENDING", "occurrences": 1, "observer": "fiber-created" },
+    { "file": "packages/core/src/fiber.ts", "category": "lifecycle", "source": "this.state = FiberState.ACTIVE", "occurrences": 1, "observer": "trace-init (root fiber)" },
+    { "file": "packages/core/src/fiber.ts", "category": "lifecycle", "source": "this.state = callback() ?? this._getState()", "occurrences": 1, "observer": "state-changed" },
+
+    { "file": "packages/core/src/fiber.ts", "category": "uid", "source": "this.uid = parent.registry.counter", "occurrences": 1, "observer": "fiber-created" },
+    { "file": "packages/core/src/fiber.ts", "category": "uid", "source": "this.uid = null", "occurrences": 1, "observer": "fiber-retired (refinement landing)" },
+    { "file": "packages/core/src/fiber.ts", "category": "uid", "source": "this.uid = 0", "occurrences": 1, "observer": "trace-init (root fiber)" },
+
+    { "file": "packages/core/src/fiber.ts", "category": "epoch", "source": "epoch: INACTIVE,", "occurrences": 1, "observer": "fiber-created" },
+    { "file": "packages/core/src/fiber.ts", "category": "epoch", "source": "epoch: '',", "occurrences": 1, "observer": "trace-init (root fiber)" },
+    { "file": "packages/core/src/fiber.ts", "category": "epoch", "source": "epoch: true,", "occurrences": 1, "observer": "inverse-bookkeeping-started" },
+    { "file": "packages/core/src/fiber.ts", "category": "epoch", "source": "runner.epoch = false", "occurrences": 2, "observer": "inverse-bookkeeping-finished" },
+    { "file": "packages/core/src/fiber.ts", "category": "epoch", "source": "this._runner.epoch = epoch", "occurrences": 1, "observer": "target-changed" },
+    { "file": "packages/core/src/fiber.ts", "category": "epoch", "source": "this._runner.epoch = INACTIVE", "occurrences": 1, "observer": "iteration-raised" },
+
+    { "file": "packages/core/src/fiber.ts", "category": "target", "source": "private _target: Dict<Impl> = Object.create(null)", "occurrences": 1, "observer": "fiber-created" },
+    { "file": "packages/core/src/fiber.ts", "category": "target", "source": "if (!impl) return delete this._store[name]", "occurrences": 1, "observer": "target-changed" },
+    { "file": "packages/core/src/fiber.ts", "category": "target", "source": "return delete this._store[name]", "occurrences": 2, "observer": "target-changed" },
+    { "file": "packages/core/src/fiber.ts", "category": "target", "source": "this._store[name] = impl", "occurrences": 1, "observer": "target-changed" },
+    { "file": "packages/core/src/fiber.ts", "category": "target", "source": "this._target = target", "occurrences": 1, "observer": "target-changed" },
+
+    { "file": "packages/core/src/fiber.ts", "category": "committed", "source": "this.store = Object.create(null)", "occurrences": 1, "observer": "trace-init (root fiber)" },
+    { "file": "packages/core/src/fiber.ts", "category": "committed", "source": "this.store = { ...this._store }", "occurrences": 1, "observer": "committed-changed" },
+    { "file": "packages/core/src/fiber.ts", "category": "committed", "source": "this.store = undefined", "occurrences": 1, "observer": "committed-changed" },
+
+    { "file": "packages/core/src/fiber.ts", "category": "registry", "source": "const remove = runtime.fibers.push(this)", "occurrences": 1, "observer": "fiber-created" },
+    { "file": "packages/core/src/fiber.ts", "category": "registry", "source": "remove()", "occurrences": 1, "observer": "fiber-removed" },
+    { "file": "packages/core/src/registry.ts", "category": "registry", "source": "this._internal.delete(key)", "occurrences": 1, "observer": "fiber-removed" },
+    { "file": "packages/core/src/registry.ts", "category": "registry", "source": "this._internal.set(callback, runtime)", "occurrences": 1, "observer": "fiber-created" },
+
+    { "file": "packages/core/src/reflect.ts", "category": "service", "source": "public store: Dict<Impl, symbol> = Object.create(null)", "occurrences": 1, "observer": "trace-init" },
+    { "file": "packages/core/src/reflect.ts", "category": "service", "source": "this.store[key] = impl", "occurrences": 1, "observer": "service-provided" },
+    { "file": "packages/core/src/reflect.ts", "category": "service", "source": "this.ctx.fiber.store![name] = impl", "occurrences": 1, "observer": "service-provided" },
+    { "file": "packages/core/src/reflect.ts", "category": "service", "source": "delete this.store[key]", "occurrences": 1, "observer": "service-withdrawing" },
+    { "file": "packages/core/src/reflect.ts", "category": "service", "source": "delete this.ctx.fiber.store![name]", "occurrences": 1, "observer": "service-withdrawn" }
+  ]
+}
