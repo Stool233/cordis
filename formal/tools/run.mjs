@@ -460,8 +460,6 @@ async function baseline() {
     'dependency-loss-during-iteration',
     'dependency-return-during-unload',
     'isolation-realms',
-    'confluence-left',
-    'confluence-right',
   ]
   const expectedFailuresFile = flag('--expected-baseline-failures')
   if (expectedFailuresFile) {
@@ -469,6 +467,7 @@ async function baseline() {
     assert.ok(Array.isArray(additional) && additional.every(name => typeof name === 'string'), 'additional baseline failures must be a string array')
     expectedFailures.push(...additional)
   }
+  expectedFailures.push('confluence-left', 'confluence-right')
   assert.deepEqual(failures, expectedFailures, 'the unmodified TLC mismatch set changed')
   report.traceMatched = 'expected-fail'
   report.expectedFailures = failures
