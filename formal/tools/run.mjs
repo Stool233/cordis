@@ -407,19 +407,22 @@ async function baseline() {
   const outputRoot = resolve(flag('--output', defaultOutput))
   await mkdir(outputRoot, { recursive: true })
   const generated = await generateTraces(outputRoot, true)
-  const behaviorReportPath = join(outputRoot, 'baseline-behavior-report.json')
-  await run('corepack', [
-    'yarn',
-    'tsx',
-    join(formalRoot, 'harness/baseline-behavior.ts'),
-    '--output',
-    behaviorReportPath,
-    '--revision',
-    generated.generatedFrom.revision,
-  ], {
-    quiet: hasFlag('--quiet'),
-    timeoutMs: 2 * 60 * 1_000,
-  })
+  let behaviorReportPath
+  if (!hasFlag('--skip-baseline-behavior')) {
+    behaviorReportPath = join(outputRoot, 'baseline-behavior-report.json')
+    await run('corepack', [
+      'yarn',
+      'tsx',
+      join(formalRoot, 'harness/baseline-behavior.ts'),
+      '--output',
+      behaviorReportPath,
+      '--revision',
+      generated.generatedFrom.revision,
+    ], {
+      quiet: hasFlag('--quiet'),
+      timeoutMs: 2 * 60 * 1_000,
+    })
+  }
   const generationReportPath = join(outputRoot, 'generation-report.json')
   const conformanceReportPath = join(outputRoot, 'conformance-report.json')
   const report = JSON.parse(await readFile(generationReportPath, 'utf8'))
@@ -460,6 +463,12 @@ async function baseline() {
     'confluence-left',
     'confluence-right',
   ]
+  const expectedFailuresFile = flag('--expected-baseline-failures')
+  if (expectedFailuresFile) {
+    const additional = JSON.parse(await readFile(resolve(expectedFailuresFile), 'utf8'))
+    assert.ok(Array.isArray(additional) && additional.every(name => typeof name === 'string'), 'additional baseline failures must be a string array')
+    expectedFailures.push(...additional)
+  }
   assert.deepEqual(failures, expectedFailures, 'the unmodified TLC mismatch set changed')
   report.traceMatched = 'expected-fail'
   report.expectedFailures = failures
@@ -468,7 +477,7 @@ async function baseline() {
   await assertPortableFiles(outputRoot, [
     generationReportPath,
     conformanceReportPath,
-    behaviorReportPath,
+    ...(behaviorReportPath ? [behaviorReportPath] : []),
     ...report.scenarios.map(scenario => resolveEvidenceReference(outputRoot, scenario.trace)),
     ...failures.map(name => join(outputRoot, 'failures', `trace-${name}.json`)),
   ])
