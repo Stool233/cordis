@@ -6,7 +6,7 @@ This directory is the authoritative executable specification for the Cordis pape
 
 The result is evidence for the revisions and finite configurations in [`provenance.json`](provenance.json). It is not an unconditional proof about arbitrary JavaScript plugins or their external side effects.
 
-For a Chinese overview of the implementation, evidence, fixes, and interpretation boundaries, see [`IMPLEMENTATION-SUMMARY.zh.md`](IMPLEMENTATION-SUMMARY.zh.md).
+For this branch's Chinese discovery record, see [`IMPLEMENTATION-SUMMARY.zh.md`](IMPLEMENTATION-SUMMARY.zh.md). The [study portal](https://github.com/Stool233/cordis-formal-study) presents the complete three-stage research journey and cross-repository reproduction commands.
 
 ## Commands
 
