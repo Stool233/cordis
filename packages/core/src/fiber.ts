@@ -523,9 +523,8 @@ export class Fiber {
       current: Object.values(this.store),
     })
     try {
-      await Promise.resolve()
-      // A disposer queued before this checkpoint may already have invalidated
-      // the load. Do not execute plugin code for a stale lifecycle epoch.
+      // A disposer queued before the deferred reload may already have
+      // invalidated the load. Do not execute plugin code for a stale epoch.
       if (this._runner.epoch === oldEpoch) {
         await this._execute(this._runner)
       }

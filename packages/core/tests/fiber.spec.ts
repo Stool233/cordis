@@ -145,6 +145,27 @@ describe('Fiber', () => {
     expect(fiber.state).to.equal(FiberState.DISPOSED)
   })
 
+  it('settles transitive service activation before an awaited provider returns', async () => {
+    const root = new Context()
+    const command = mock.fn()
+
+    root.plugin({
+      inject: ['cli'],
+      apply(ctx) {
+        ctx.provide('yakumo', true)
+      },
+    })
+    const commandFiber = root.plugin({
+      inject: ['yakumo', 'cli'],
+      apply: command,
+    })
+
+    await root.plugin(ctx => ctx.provide('cli', true))
+
+    expect(command.mock.calls).to.have.length(1)
+    expect(commandFiber.state).to.equal(FiberState.ACTIVE)
+  })
+
   it('starts independent top-level recovery concurrently in reverse order', async () => {
     const root = new Context()
     const order: string[] = []
