@@ -1,4 +1,4 @@
-import { Context, Inject, Plugin, Service } from 'cordis'
+import { Context, Fiber, Inject, Plugin, Service } from 'cordis'
 import { Dict } from 'cosmokit'
 import { ModuleJob, ModuleLoader, ResolveResult } from '@cordisjs/plugin-loader'
 import type { Include } from '@cordisjs/plugin-include'
@@ -231,6 +231,7 @@ class Hmr extends Service {
 
     const pending = new Map<ModuleJob, Plugin>()
     const reloads = new Map<Plugin, Reload>()
+    const fibers = new Map<Plugin, Fiber[]>()
 
     // Build a map of plugin names per config tree URL.
     // Plugin entry files are treated as atomic reload units.
@@ -265,10 +266,12 @@ class Hmr extends Service {
       if (!dependencies.some(dep => this.accepted.has(dep))) continue
       dependencies.forEach(dep => this.accepted.add(dep))
 
+      const runtime = this.ctx.registry.get(plugin)
       reloads.set(plugin, {
         filename: job.url,
-        runtime: this.ctx.registry.get(plugin),
+        runtime,
       })
+      if (runtime) fibers.set(plugin, [...runtime.fibers])
     }
 
     /**
@@ -328,9 +331,8 @@ class Hmr extends Service {
       return rollback()
     }
 
-    const reload = (plugin: any, runtime: Plugin.Runtime) => {
-      if (!runtime) return
-      for (const oldFiber of runtime.fibers) {
+    const reload = (plugin: any, oldFibers: Fiber[]) => {
+      for (const oldFiber of oldFibers) {
         const fiber = oldFiber.parent.registry.plugin(plugin, oldFiber.config, this.getOuterStack)
         fiber.entry = oldFiber.entry
         if (fiber.entry) fiber.entry.fiber = fiber
@@ -350,7 +352,7 @@ class Hmr extends Service {
         }
 
         try {
-          reload(attempts[filename], runtime)
+          reload(attempts[filename], fibers.get(plugin)!)
           this.ctx.logger.info('reload plugin at %C', path)
         } catch (err) {
           this.ctx.logger.warn('failed to reload plugin at %C', path)
@@ -365,7 +367,7 @@ class Hmr extends Service {
         if (!runtime) continue
         try {
           this.ctx.registry.delete(attempts[filename])
-          reload(plugin, runtime)
+          reload(plugin, fibers.get(plugin)!)
         } catch (err) {
           this.ctx.logger.warn(err)
         }
