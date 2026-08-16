@@ -1,5 +1,7 @@
 # Cordis paper conformance
 
+> Branch role: `research/paper-conformance` combines the paper-derived specification and trace instrumentation with the confirmed runtime fixes. The unmodified diagnostic line is `research/paper-trace-baseline`; the trace-free upstream patch is `fix/paper-conformance`.
+
 This directory is the authoritative executable specification for the Cordis paper. It provides three bounded forms of evidence: TLC exploration of the abstract machines, refinement checks over deterministic implementation traces, and explicit audits of theorem prerequisites that traces cannot establish.
 
 The result is evidence for the revisions and finite configurations in [`provenance.json`](provenance.json). It is not an unconditional proof about arbitrary JavaScript plugins or their external side effects.

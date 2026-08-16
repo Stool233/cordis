@@ -1,10 +1,12 @@
 # Cordis 论文 TLA+ 形式化与实现轨迹验证：实施总结
 
+> 当前分支角色：`research/paper-conformance` 同时包含论文驱动的规格、轨迹插桩和已确认的运行时修复。保留原始实现并复现反例的分支是 `research/paper-trace-baseline`；不含插桩、用于上游 PR 的纯逻辑分支是 `fix/paper-conformance`。
+
 本文面向希望快速理解本次工作的读者，说明我们为什么要做形式化验证、三个仓库分别发生了什么变化、验证结果意味着什么，以及它不意味着什么。完整的可执行规格仍以本目录中的 TLA+ 模块为准。
 
 ## 一句话结论
 
-我们已经为 Cordis 论文建立了一条可重复运行的三层证据链：TLC 对论文抽象状态机做有界穷举；确定性轨迹把上游 Cordis 和 DeepSeek Harness 中的 vendored Cordis 映射到同一抽象状态机并逐状态比较；无法从有限运行轨迹推出的前提则单独审计。验证过程中发现了三个真实的实现顺序偏差，并修改实现而没有放宽论文规格。
+我们已经为 Cordis 论文建立了一条可重复运行的三层证据链：TLC 对论文抽象状态机做有界穷举；确定性轨迹把上游 Cordis 和 DeepSeek Harness 中的 vendored Cordis 映射到同一抽象状态机并逐状态比较；无法从有限运行轨迹推出的前提则单独审计。验证过程中发现了两类真实的实现顺序偏差，并厘清了一个恢复粒度的 refinement 边界；实现修复没有放宽论文规格。
 
 这是一份针对固定版本、有限模型和已采集轨迹的 refinement 证据，不是对任意 JavaScript 插件及其外部副作用的无条件数学证明。
 
@@ -98,12 +100,12 @@ Specula 在这里是方法和调试体验的参考：验证器采用确定性事
 
 同一 service 名称在不同 isolation realm 中会投影为不同的 `(logical key, realm)`；同值但不同 provider identity 也不能被误判为同一个绑定。
 
-## 验证发现并修复的实现偏差
+## 验证发现的实现偏差与 refinement 边界
 
-轨迹比较确认了三个实现顺序问题。修复同时进入上游 Cordis 和 DeepSeek Harness 的 vendored Cordis：
+轨迹比较确认了两类实现顺序偏差，并厘清了一个恢复粒度边界。修复同时进入上游 Cordis 和 DeepSeek Harness 的 vendored Cordis：
 
 1. **Provider 恢复过早。** 原 `_unload()` 会并发启动所有顶层 disposer，导致 provider 自身 inverse 可能在异步 consumer 完成退出前开始。现在 provider 从 `ACTIVE` 离开时先记录并等待所有 dependent fibers 完成，再启动任何 provider inverse。
-2. **恢复次序存在两个层次。** 每个 `ctx.effect()` iterator 内收集的 inverse 严格串行并按 LIFO 恢复；相互独立的顶层 structural wrapper 按注册逆序启动并并发 join，这与论文 Section 5.1.3 的实现说明一致。wrapper 只属于 refinement bookkeeping，真正进入抽象资源集合的是其内部 inverse。
+2. **恢复次序的 refinement 边界。** 每个 `ctx.effect()` iterator 内收集的 inverse 严格串行并按 LIFO 恢复；相互独立的顶层 structural wrapper 按注册逆序启动并并发 join，这与论文 Section 5.1.3 的实现说明一致。wrapper 只属于 refinement bookkeeping，真正进入抽象资源集合的是其内部 inverse。
 3. **生命周期与可见视图落地顺序不一致。** 原实现可能在 fiber 仍投影为 Inactive 时提交 store，或在 L-Leave 前暴露新 target。现在 `Reloading`/`Unloading` 生命周期先落地，再暴露相容的 target 或 committed view。
 
 另一个重要审计结论是：论文中的静态 provision `p` 不能直接等同于当前 `Plugin.provide` 元数据。该元数据尚未参与核心生命周期解析；真正的实现供给来自 `ctx.provide()` 产生的稳定 `(logical key, realm)` episode。因此，`TotalProvision` 只在 harness 完全控制 provider 的闭合场景中成立，不能推广到任意插件树。
