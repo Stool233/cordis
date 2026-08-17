@@ -47,12 +47,22 @@ const prModels = [
   { module: 'CordisConfluence', config: 'CordisConfluence.cfg', properties: ['CanonicalTerminalEquality', 'EventuallyCanonical'] },
 ]
 
+const kernelProperties = ['Preservation', 'RecoveryExactness', 'Ordering', 'ResolutionCoherence', 'Progress']
+const kernelInvariantProperties = kernelProperties.filter(property => property !== 'Progress')
+const expandedSimulation = { workers: 2, tracesPerWorker: 50_000, depth: 100, seed: 113, aril: 0 }
+
 const nightlyModels = [
   { module: 'CordisEffects', config: 'nightly/CordisEffects.cfg', properties: ['WriteLocality', 'LifoRecovery', 'RecoveryExactness', 'IndependentExchangeInvariant'] },
-  { module: 'CordisKernel', config: 'nightly/CordisKernel.cfg', properties: ['Preservation', 'RecoveryExactness', 'Ordering', 'ResolutionCoherence', 'Progress'] },
-  { module: 'CordisKernel', config: 'nightly/CordisKernelNoFailure.cfg', properties: ['Preservation', 'RecoveryExactness', 'Ordering', 'ResolutionCoherence', 'Progress'] },
-  { module: 'CordisRuntime', config: 'nightly/CordisRuntime.cfg', properties: ['RuntimeRefinesPaper'] },
-  { module: 'CordisConfluence', config: 'nightly/CordisConfluence.cfg', properties: ['CanonicalTerminalEquality', 'EventuallyCanonical'] },
+  { module: 'CordisKernel', config: 'CordisKernelNoFailure.cfg', properties: kernelProperties },
+  { module: 'CordisKernel', config: 'nightly/CordisKernelBindings.cfg', properties: kernelProperties },
+  { module: 'CordisKernel', config: 'nightly/CordisKernelIterations.cfg', properties: kernelProperties },
+  { module: 'CordisKernel', config: 'nightly/CordisKernelDepth.cfg', properties: kernelProperties },
+  { module: 'CordisKernel', config: 'nightly/CordisKernel.cfg', properties: kernelInvariantProperties, mode: 'simulation', simulation: expandedSimulation },
+  { module: 'CordisKernel', config: 'nightly/CordisKernelNoFailure.cfg', properties: kernelInvariantProperties, mode: 'simulation', simulation: expandedSimulation },
+  { module: 'CordisRuntime', config: 'CordisRuntime.cfg', properties: ['RuntimeRefinesPaper'] },
+  { module: 'CordisRuntime', config: 'nightly/CordisRuntime.cfg', properties: ['RuntimeRefinesPaper'], mode: 'simulation', simulation: expandedSimulation },
+  { module: 'CordisConfluence', config: 'CordisConfluence.cfg', properties: ['CanonicalTerminalEquality', 'EventuallyCanonical'] },
+  { module: 'CordisConfluence', config: 'nightly/CordisConfluence.cfg', properties: ['CanonicalTerminalEquality'], mode: 'simulation', simulation: expandedSimulation },
 ]
 
 class CommandFailure extends Error {
@@ -154,6 +164,15 @@ function modelStats(output) {
   }
 }
 
+function simulationStats(output) {
+  const checked = output.match(/The number of states generated: ([\d,]+)/)
+  const traces = [...output.matchAll(/([\d,]+) traces generated/g)].at(-1)
+  return {
+    checkedStates: checked ? Number(checked[1].replaceAll(',', '')) : null,
+    traces: traces ? Number(traces[1].replaceAll(',', '')) : null,
+  }
+}
+
 function failureDetails(output, extra = {}) {
   const theorem = output.match(/Invariant ([A-Za-z0-9_]+) is violated/)?.[1]
     ?? output.match(/The temporal property ([A-Za-z0-9_]+) is violated/)?.[1]
@@ -203,7 +222,12 @@ async function invokeTlc(tool, model, options = {}) {
     '-noGenerateSpecTE',
   ]
   if (options.deadlock === false) args.push('-deadlock')
-  if (options.simulate) args.push('-simulate', `num=${options.simulate}`)
+  if (options.simulate) {
+    args.push('-simulate', `num=${options.simulate.tracesPerWorker}`)
+    args.push('-depth', String(options.simulate.depth))
+    args.push('-seed', String(options.simulate.seed))
+    args.push('-aril', String(options.simulate.aril))
+  }
   args.push(join(formalRoot, `${model.module}.tla`))
   return run('java', args, {
     env: options.env,
@@ -228,19 +252,25 @@ async function model(profile = 'pr') {
   const results = []
   for (const entry of selected) {
     const label = `${profile}-${entry.module}-${entry.config.replaceAll('/', '-').replace('.cfg', '')}`
+    const mode = entry.mode ?? 'exhaustive'
     try {
-      const result = await invokeTlc(tool, entry, { label, outputRoot, timeoutMs, quiet: hasFlag('--quiet') })
-      const stats = modelStats(result.stdout)
-      results.push({ name: label, status: 'pass', properties: Object.fromEntries(entry.properties.map(property => [property, 'pass'])), ...stats })
-      if (profile === 'nightly' && stats.diameter !== null && stats.diameter < 10) {
-        await invokeTlc(tool, entry, { label: `${label}-simulation`, outputRoot, timeoutMs, simulate: 100_000, quiet: hasFlag('--quiet') })
-        results.at(-1).simulation = 'pass'
+      const result = await invokeTlc(tool, entry, { label, outputRoot, timeoutMs, workers: entry.simulation?.workers, simulate: entry.simulation, quiet: hasFlag('--quiet') })
+      let evidence
+      if (mode === 'simulation') {
+        const stats = simulationStats(result.stdout)
+        const requestedTraces = entry.simulation.workers * entry.simulation.tracesPerWorker
+        assert.equal(stats.traces, requestedTraces, `${label} did not generate the requested simulation traces`)
+        evidence = { mode, ...stats, requestedTraces, traceDepth: entry.simulation.depth, seed: entry.simulation.seed, aril: entry.simulation.aril }
+      } else {
+        evidence = { mode, ...modelStats(result.stdout) }
       }
+      results.push({ name: label, status: 'pass', properties: Object.fromEntries(entry.properties.map(property => [property, 'pass'])), ...evidence })
     } catch (error) {
       if (!(error instanceof CommandFailure)) throw error
       const failure = join(outputRoot, 'failures', `${label}.json`)
-      await writeFailure(failure, error.result, { model: entry.module, config: entry.config }, evidenceRoots(tool, outputRoot))
-      results.push({ name: label, status: 'fail', properties: Object.fromEntries(entry.properties.map(property => [property, 'fail'])), ...modelStats(error.result.stdout) })
+      await writeFailure(failure, error.result, { model: entry.module, config: entry.config, mode }, evidenceRoots(tool, outputRoot))
+      const evidence = mode === 'simulation' ? simulationStats(error.result.stdout) : modelStats(error.result.stdout)
+      results.push({ name: label, status: 'fail', properties: Object.fromEntries(entry.properties.map(property => [property, 'fail'])), mode, ...evidence })
       const report = join(outputRoot, 'model-report.json')
       await writeFile(report, JSON.stringify({ schema: 'cordis.paper-model-report/v1', profile, results }, null, 2) + '\n')
       await assertPortableFiles(outputRoot, [failure, report])

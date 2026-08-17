@@ -43,12 +43,65 @@
       "search": "BFS"
     },
     "nightly": {
-      "fibers": 5,
-      "bindings": 3,
-      "maxIterations": 3,
-      "registrationDepth": 2,
       "timeoutMinutesPerModel": 30,
-      "search": "BFS with simulation supplement when diameter is below 10"
+      "search": "layered exhaustive BFS with a fixed-seed combined-bound simulation",
+      "exhaustiveKernelConfigurations": {
+        "bindings": {
+          "fibers": 3,
+          "bindings": 3,
+          "maxIterations": 1,
+          "registrationDepth": 1,
+          "allowFailure": true
+        },
+        "iterations": {
+          "fibers": 3,
+          "bindings": 1,
+          "maxIterations": 3,
+          "registrationDepth": 1,
+          "allowFailure": true
+        },
+        "registrationDepth": {
+          "fibers": 3,
+          "bindings": 1,
+          "maxIterations": 1,
+          "registrationDepth": 2,
+          "allowFailure": true,
+          "exploreAllTopologies": true
+        },
+        "noFailurePullRequest": {
+          "fibers": 3,
+          "bindings": 2,
+          "maxIterations": 2,
+          "registrationDepth": 1,
+          "allowFailure": false
+        }
+      },
+      "combinedSimulations": {
+        "kernel": {
+          "fibers": 5,
+          "bindings": 3,
+          "maxIterations": 3,
+          "registrationDepth": 2,
+          "failureModes": [
+            true,
+            false
+          ]
+        },
+        "runtime": {
+          "fibers": 5,
+          "logicalKeys": 3,
+          "realms": 3,
+          "maxIterations": 3
+        },
+        "confluence": {
+          "components": 5,
+          "maxEffectSteps": 3
+        },
+        "tracesPerRun": 100000,
+        "traceDepth": 100,
+        "seed": 113,
+        "aril": 0
+      }
     }
   },
   "boundary": "Evidence applies to these revisions, bounded models, declared prerequisites, and captured traces. It is not an unconditional mathematical proof of arbitrary JavaScript plugin side effects."

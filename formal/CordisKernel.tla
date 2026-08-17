@@ -61,6 +61,14 @@ ResolveAll(pres, reti, phases, deps, provisions) ==
     ELSE EmptyBinding]
 
 RECURSIVE CascadeLeaves(_, _, _)
+RECURSIVE ParentDepth(_, _)
+
+ParentDepth(owner, steps) ==
+  IF owner = Root
+  THEN 0
+  ELSE IF steps = 0
+       THEN MaxDepth + 1
+       ELSE 1 + ParentDepth(parent[owner], steps - 1)
 
 CascadeLeaves(phases, reti, steps) ==
   IF steps = 0
@@ -116,7 +124,8 @@ OInsert(fiber, owner, deps, provides) ==
   /\ ~orchestrationFixed
   /\ fiber \in Fibers \ present
   /\ fiber \notin everRetired
-  /\ owner \in IF MaxDepth = 1 THEN {Root} ELSE present \cup {Root}
+  /\ owner \in present \cup {Root}
+  /\ ParentDepth(owner, Cardinality(Fibers)) < MaxDepth
   /\ deps \subseteq ProvidedKeys(present, provision)
   /\ provides \subseteq Keys
   /\ deps \cap provides = {}

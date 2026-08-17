@@ -20,7 +20,9 @@ yarn formal:evidence
 yarn formal:check
 ```
 
-`formal:check` is the pull-request gate. `formal:nightly` selects the larger five-fiber, three-binding, three-iteration, depth-two configurations and imposes a 30-minute timeout on each TLC run. If a completed nightly BFS has diameter below 10, the runner supplements it with 100,000 simulation traces.
+`formal:check` is the pull-request gate. `formal:nightly` uses layered bounds so that its report distinguishes exhaustive and sampled evidence. It exhaustively checks the expanded effects model; the kernel receives separate exhaustive configurations for three bindings, three iterator steps, and registration depth two, plus the no-failure pull-request configuration. The pull-request runtime and confluence bounds remain exhaustive. The combined five-fiber kernel, five-fiber runtime, and five-component confluence bounds are each sampled with exactly 100,000 fixed-seed traces; both kernel failure modes are sampled separately. Each TLC invocation retains a 30-minute timeout.
+
+Every model result records `mode` as `exhaustive` or `simulation`. The simulation uses seed `113`, aril `0`, and depth `100`; it checks invariants but does not claim temporal properties. `Progress` and `EventuallyCanonical` remain required and are reported only by completed exhaustive BFS runs. `MaxDepth` is a real parent-chain bound: a depth-two configuration cannot silently explore deeper registration trees.
 
 The runner downloads TLA+ Tools 1.8.0 and CommunityModules `202505152026` into `formal/.cache/`, verifies both SHA-256 values before execution, and never commits the JARs. Set `CORDIS_TLA_TOOLS_JAR` and `CORDIS_TLA_COMMUNITY_JAR` to verified local copies, or set `CORDIS_TLA_CACHE` to another cache directory.
 
