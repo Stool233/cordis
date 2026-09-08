@@ -416,10 +416,8 @@ class Hmr extends Service {
       if (!runtime) continue
       const path = relative(this.baseDir, fileURLToPath(filename))
 
-      // `registry.delete()` deliberately leaves the fibers in `runtime.fibers`
-      // (the `registry.has()` guard in `Fiber` skips the removal) so that we
-      // can rebuild from them; snapshot anyway, as the list is backed by a
-      // live `Map` iterator.
+      // Teardown removes settled fibers from the live runtime list. Capture
+      // every old instance before disposal so stage 3 can rebuild it.
       const fibers = [...runtime.fibers]
       try {
         this.ctx.registry.delete(plugin)

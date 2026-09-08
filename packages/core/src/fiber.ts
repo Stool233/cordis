@@ -118,6 +118,7 @@ export class Fiber {
   private _error: any
   private _runner: EffectRunner<string>
   private _store: Dict<Impl> = Object.create(null)
+  private _pendingDependents = new Set<Fiber>()
 
   constructor(
     public parent: Context,
@@ -179,12 +180,6 @@ export class Fiber {
         return async () => {
           this.uid = null
           this.context.emit('internal/plugin', this)
-          if (this.ctx.registry.has(runtime.callback)) {
-            remove()
-            if (!runtime.fibers.length) {
-              this.ctx.registry.delete(runtime.callback)
-            }
-          }
           this._setEpoch(INACTIVE)
           // `this.inertia` itself should never reject — both `_reload` and
           // `_unload` swallow their own work errors via `ctx.logger.error`.
@@ -194,6 +189,10 @@ export class Fiber {
           // rejection propagate; process-level crash is the honest outcome.
           while (this.inertia) {
             await this.inertia
+          }
+          remove()
+          if (!runtime.fibers.length && this.ctx.registry.get(runtime.callback) === runtime) {
+            this.ctx.registry.delete(runtime.callback)
           }
         }
       }, 'ctx.plugin()')
@@ -364,7 +363,12 @@ export class Fiber {
     for (const key of Reflect.ownKeys(this.ctx.reflect.store)) {
       const impl = this.ctx.reflect.store[key as symbol]
       if (impl.fiber !== this) continue
-      this.ctx.reflect.notify([impl.name])
+      const fibers = this.ctx.reflect.notify([impl.name])
+      if (oldState === FiberState.ACTIVE && this.state !== FiberState.ACTIVE) {
+        for (const fiber of fibers) {
+          if (fiber !== this) this._pendingDependents.add(fiber)
+        }
+      }
     }
   }
 
@@ -401,25 +405,29 @@ export class Fiber {
     if (epoch === oldEpoch) return
     // a failed fiber only recovers through update(), which clears _error
     if (this._error) return
+    const beginsReload = epoch !== INACTIVE && oldEpoch === INACTIVE
+    if (!this.inertia && !beginsReload) {
+      this._updateState(() => FiberState.UNLOADING)
+    }
     this._runner.epoch = epoch
     if (this.inertia) return
-    this._updateState(() => {
-      if (epoch !== INACTIVE && oldEpoch === INACTIVE) {
-        this.inertia = this._reload()
+    if (beginsReload) {
+      this._updateState(() => {
+        const epoch = this._runner.epoch
+        this.inertia = Promise.resolve().then(() => this._reload(epoch))
         return FiberState.LOADING
-      } else {
-        this.inertia = this._unload()
-        return FiberState.UNLOADING
-      }
-    })
+      })
+    } else {
+      this.inertia = this._unload()
+    }
   }
 
-  private async _reload() {
+  private async _reload(oldEpoch: string) {
     this.store = { ...this._store }
-    const oldEpoch = this._runner.epoch
     try {
-      await Promise.resolve()
-      await this._execute(this._runner)
+      if (this._runner.epoch === oldEpoch) {
+        await this._execute(this._runner)
+      }
     } catch (reason) {
       // impl guarantees that the error is non-null (?)
       this.ctx.logger.error(reason)
@@ -437,6 +445,11 @@ export class Fiber {
   }
 
   private async _unload() {
+    const dependents = [...this._pendingDependents]
+    this._pendingDependents.clear()
+    if (dependents.length) {
+      await Promise.allSettled(dependents.map(fiber => fiber.await()))
+    }
     await Promise.all(this._disposables.clear().map(async (dispose) => {
       try {
         await composeError(async (info) => {
@@ -453,7 +466,8 @@ export class Fiber {
       if (this._runner.epoch === INACTIVE) {
         this.inertia = undefined
       } else {
-        this.inertia = this._reload()
+        const epoch = this._runner.epoch
+        this.inertia = Promise.resolve().then(() => this._reload(epoch))
         return FiberState.LOADING
       }
     })

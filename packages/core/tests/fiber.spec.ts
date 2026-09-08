@@ -62,6 +62,141 @@ describe('Fiber', () => {
     expect(fiber.state).to.equal(FiberState.PENDING)
   }))
 
+  it('keeps provider resources until asynchronous consumers finish unloading', async () => {
+    const root = new Context()
+    const resource = { available: true }
+    const observations: boolean[] = []
+
+    const provider = await root.plugin((ctx) => {
+      ctx.provide('resource', resource)
+      ctx.effect(() => () => {
+        resource.available = false
+      }, 'provider resource')
+    })
+    const consumer = await root.plugin({
+      inject: ['resource'],
+      apply(ctx) {
+        void (ctx as any).resource
+        return async () => {
+          await Promise.resolve()
+          observations.push(resource.available)
+        }
+      },
+    })
+
+    await provider.dispose()
+
+    expect(observations).to.deep.equal([true])
+    expect(resource.available).to.equal(false)
+    expect(consumer.state).to.equal(FiberState.PENDING)
+  })
+
+  it('keeps retiring consumers discoverable during concurrent root disposal', async () => {
+    const root = new Context()
+    const resource = { available: true }
+    const observations: boolean[] = []
+    let cleanupStarted!: () => void
+    let releaseCleanup!: () => void
+    const started = new Promise<void>(resolve => { cleanupStarted = resolve })
+    const barrier = new Promise<void>(resolve => { releaseCleanup = resolve })
+
+    await root.plugin((ctx) => {
+      ctx.provide('resource', resource)
+      ctx.effect(() => () => {
+        resource.available = false
+      }, 'provider resource')
+    })
+    await root.plugin({
+      inject: ['resource'],
+      apply(ctx) {
+        void (ctx as any).resource
+        return async () => {
+          cleanupStarted()
+          await barrier
+          observations.push(resource.available)
+        }
+      },
+    })
+
+    const disposing = root.fiber.dispose()
+    try {
+      await started
+      await Promise.resolve()
+      await Promise.resolve()
+      expect(resource.available).to.equal(true)
+    } finally {
+      releaseCleanup()
+      await disposing
+    }
+
+    expect(observations).to.deep.equal([true])
+    expect(resource.available).to.equal(false)
+  })
+
+  it('drains effects when disposal wins the deferred reload checkpoint', async () => {
+    const root = new Context()
+    const cleanup = mock.fn()
+    const apply = mock.fn()
+    const fiber = root.plugin(apply)
+    fiber.ctx.effect(() => cleanup, 'loading cleanup')
+
+    await fiber.dispose()
+
+    expect(apply.mock.calls).to.have.length(0)
+    expect(cleanup.mock.calls).to.have.length(1)
+    expect(fiber.getEffects()).to.deep.equal([])
+    expect(fiber.state).to.equal(FiberState.DISPOSED)
+  })
+
+  it('settles transitive service activation before an awaited provider returns', async () => {
+    const root = new Context()
+    const command = mock.fn()
+
+    root.plugin({
+      inject: ['cli'],
+      apply(ctx) {
+        ctx.provide('yakumo', true)
+      },
+    })
+    const commandFiber = root.plugin({
+      inject: ['yakumo', 'cli'],
+      apply: command,
+    })
+
+    await root.plugin(ctx => ctx.provide('cli', true))
+
+    expect(command.mock.calls).to.have.length(1)
+    expect(commandFiber.state).to.equal(FiberState.ACTIVE)
+  })
+
+  it('starts independent top-level recovery concurrently in reverse order', async () => {
+    const root = new Context()
+    const order: string[] = []
+    let active = 0
+    let maximum = 0
+    const recover = async (label: string) => {
+      order.push(`${label}:start`)
+      maximum = Math.max(maximum, ++active)
+      await Promise.resolve()
+      order.push(`${label}:end`)
+      active--
+    }
+    const fiber = await root.plugin((ctx) => {
+      ctx.effect(() => () => recover('first'), 'first')
+      ctx.effect(() => () => recover('second'), 'second')
+    })
+
+    await fiber.dispose()
+
+    expect(order).to.deep.equal([
+      'second:start',
+      'first:start',
+      'second:end',
+      'first:end',
+    ])
+    expect(maximum).to.equal(2)
+  })
+
   it('plugin error', async () => {
     const root = new Context()
     const callback = mock.fn()

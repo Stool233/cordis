@@ -1,4 +1,4 @@
-import { Context, Inject, Service } from 'cordis'
+import { Context, FiberState, Inject, Service } from 'cordis'
 import { Awaitable, defineProperty, Dict, isNullable } from 'cosmokit'
 import { ModuleLoader } from './internal.ts'
 import { Entry, EntryOptions } from './config/entry.ts'
@@ -112,8 +112,8 @@ export class Loader extends EntryTree {
       // plugin hmr: delete(plugin) -> runtime dispose -> fiber dispose
       if (!ctx.registry.has(fiber.runtime!.callback)) return
 
-      // case 5: the entry's tree is being disposed
-      if (!fiber.entry.parent.tree.ctx.fiber.uid) return
+      // case 5: the entry's tree is not active
+      if (fiber.entry.parent.tree.ctx.fiber.state !== FiberState.ACTIVE) return
 
       const { entry } = fiber
       this.showLog(entry, 'unload')
