@@ -1,21 +1,23 @@
-# Cordis implementation guide
+# Cordis TLC contribution guide
 
 English | [中文](formal-study.zh-CN.md)
 
-Use this page to locate the Cordis source selected by the [current study](https://github.com/Stool233/cordis-formal-study). The portal owns the paper reading, shared checks, and result report.
+This fork carries fixes for two lifecycle defects established through the [Cordis study's TLC workflow](https://github.com/Stool233/cordis-formal-study/blob/main/docs/contributions.md): provider recovery starts before dependent cleanup finishes, and retirement hides a consumer that still needs cleanup.
 
-## Read the selected source
+## Locate the fixes
 
-The study uses [Cordis core at 18c327f](https://github.com/Stool233/cordis/tree/18c327f4566e8f640737c43a480e6d74a0673579/packages/core/src), based on official [f8ea3cd](https://github.com/cordiverse/cordis/tree/f8ea3cd50f1a5724e8e715995bcde131c9c12b2c). The fork commit includes lifecycle fixes and ordinary regressions. Its branch is `codex/upstream-alignment-2026-09-09`; the full commit in the portal lock identifies the evidence.
+The study selects [Cordis core at 18c327f](https://github.com/Stool233/cordis/tree/18c327f4566e8f640737c43a480e6d74a0673579/packages/core/src), based on official [f8ea3cd](https://github.com/cordiverse/cordis/tree/f8ea3cd50f1a5724e8e715995bcde131c9c12b2c). The fixed source is on `codex/upstream-alignment-2026-09-09`; the default branch provides official source and this reading guide.
 
-Fiber manages plugin activation and cleanup. Its disposal path retains the consumer's registry entry until cleanup finishes and waits for dependent cleanup before provider recovery. Service resolution carries provider identity. The [paper guide](https://github.com/Stool233/cordis-formal-study/blob/main/docs/paper.md) explains the corresponding requirements.
+The disposal path waits for notified dependents before provider recovery and retains retiring consumers in the runtime list until cleanup settles. The [contribution guide](https://github.com/Stool233/cordis-formal-study/blob/main/docs/contributions.md) connects the faulty recovery events with these repairs. The [implementation reference](https://github.com/Stool233/cordis-formal-study/blob/main/docs/implementation.md) owns exact version selection.
 
-## Check the behavior
+## Follow the evidence
 
-The portal runs three shared behavior checks on this source and on the Harness fork: dependency cleanup order, retirement discoverability, and replacement-provider identity. It exports committed source and executes real Context operations without trace instrumentation.
+The [verification guide](https://github.com/Stool233/cordis-formal-study/blob/main/docs/verification.md) connects unmodified-source traces, TLC counterexamples, fixed-source traces, and negative controls. Ordinary resource and registry regressions supplement that chain; passing behavior checks alone are not the contribution.
 
-Follow [Reproduction](https://github.com/Stool233/cordis-formal-study/blob/main/docs/reproduce.md) to run the checks. [Verification](https://github.com/Stool233/cordis-formal-study/blob/main/docs/verification.md) defines the inputs and the scope of a pass.
+[Reproduction](https://github.com/Stool233/cordis-formal-study/blob/main/docs/reproduce.md) provides both TLC replay of captured observations and fresh fixed-source trace generation. It explains which operation executes implementation code. The portal bundles the exact formal tools so changing official release assets does not change the selected bytes.
 
-## Further reading
+## Read the paper in context
 
-The [implementation reference](https://github.com/Stool233/cordis-formal-study/blob/main/docs/implementation.md) owns version selection and dependency details. The [archive](https://github.com/Stool233/cordis-formal-study/blob/main/archive/README.md) preserves earlier branches and model evidence.
+The [current paper guide](https://github.com/Stool233/cordis-formal-study/blob/main/docs/paper.md) relates the cleanup findings to guarded L-Unload, ordering, and retirement. The evidence concerns specific implementation defects under declared dependencies; it does not prove the full current calculus. Provider identity is supporting coverage, not a separately claimed discovery.
+
+The [archive](https://github.com/Stool233/cordis-formal-study/blob/main/archive/README.md) preserves broader historical claims and experiment history. Confirmed TLC contributions and their executable evidence remain in the portal's main reading path.
