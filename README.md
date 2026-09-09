@@ -1,26 +1,20 @@
-# Cordis — formal study fork
+# Cordis: paper and implementation fork
 
 English | [中文](README.zh-CN.md)
 
-This is Stool233's research fork of [Cordis](https://github.com/cordiverse/cordis), a framework for composing plugins, services, and reversible effects. It supports the independent [Cordis Formal Study](https://github.com/Stool233/cordis-formal-study).
+This fork supplies Cordis source for the independent [Cordis study](https://github.com/Stool233/cordis-formal-study). Cordis organizes programs through plugins, services, and reversible effects.
 
 ## Start here
 
-| Your goal | Read next |
+| Goal | Read |
 | --- | --- |
-| Understand the findings and the three repositories | [Study overview](https://github.com/Stool233/cordis-formal-study) |
-| Choose a branch or inspect the lifecycle fix | [Fork guide](docs/formal-study.md) |
-| Reproduce models and implementation traces | [Reproduction guide](https://github.com/Stool233/cordis-formal-study/blob/main/docs/reproduce.md) |
-| Learn the programming model | [Cordis primer](https://deepseek-harness.github.io/deepseek-harness/reference/cordis-primer) |
+| Understand the current paper | [Paper reading](https://github.com/Stool233/cordis-formal-study/blob/main/docs/paper.md) |
+| Locate the checked implementation | [Fork guide](docs/formal-study.md) |
+| Understand the confirmed behavior checks | [Verification](https://github.com/Stool233/cordis-formal-study/blob/main/docs/verification.md) |
+| Run the checks | [Reproduction](https://github.com/Stool233/cordis-formal-study/blob/main/docs/reproduce.md) |
 
-## Branches at a glance
+The paper is [A Programming Paradigm for Spatiotemporal Composability, arXiv v1](https://arxiv.org/abs/2608.25512v1). The study checks dependency cleanup order, consumer discoverability during retirement, and replacement-provider identity on pinned fork source.
 
-`main` follows official upstream code and adds these fork documents. `codex/upstream-alignment-2026-09-09` carries the migrated lifecycle fixes and ordinary regressions, without runtime trace hooks.
+The default branch contains official source and this reading guide. The study's [implementation page](https://github.com/Stool233/cordis-formal-study/blob/main/docs/implementation.md) selects the fixed fork commit. Passing its concrete regression checks does not prove arbitrary plugin effects or the complete paper calculus.
 
-The three historical experiment branches remain pinned by the study portal. A branch name alone is not an evidence version; use the [branch guide](docs/formal-study.md#branches-and-evidence) before comparing results.
-
-## About Cordis
-
-Cordis's design is described in *A Programming Paradigm for Spatiotemporal Composability*: [paper repository](https://github.com/cordiverse/paper), [arXiv](https://arxiv.org/abs/2608.25512).
-
-Cordis is under active development; its API can change. This study concerns finite models and selected lifecycle scenarios. It does not establish correctness for every plugin or arbitrary external effects.
+Earlier research is available through the portal's [archive](https://github.com/Stool233/cordis-formal-study/blob/main/archive/README.md).

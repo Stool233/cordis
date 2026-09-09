@@ -1,26 +1,20 @@
-# Cordis — 形式化研究 fork
+# Cordis：论文与实现 fork
 
 [English](README.md) | 中文
 
-这是 Stool233 为 [Cordis](https://github.com/cordiverse/cordis) 形式化研究维护的 fork。Cordis 用插件、服务与可逆 effect 组织程序；本仓库为独立的 [Cordis Formal Study](https://github.com/Stool233/cordis-formal-study) 提供实现与实验分支。
+本 fork 为独立的 [Cordis 研究](https://github.com/Stool233/cordis-formal-study)提供框架源码。Cordis 通过插件、服务与可逆 effect 组织程序。
 
 ## 从这里开始
 
-| 你想了解什么 | 接着读 |
+| 目的 | 阅读 |
 | --- | --- |
-| 研究发现，以及三个仓库如何分工 | [研究概览](https://github.com/Stool233/cordis-formal-study/blob/main/README.zh-CN.md) |
-| 选择分支或查看生命周期修复 | [Fork 使用指南](docs/formal-study.zh-CN.md) |
-| 复现模型与实现轨迹检查 | [复现指南](https://github.com/Stool233/cordis-formal-study/blob/main/docs/reproduce.zh-CN.md) |
-| 学习编程模型 | [Cordis primer](https://deepseek-harness.github.io/deepseek-harness/reference/cordis-primer) |
+| 理解当前论文 | [论文阅读](https://github.com/Stool233/cordis-formal-study/blob/main/docs/paper.zh-CN.md) |
+| 找到被检查的实现 | [Fork 指南](docs/formal-study.zh-CN.md) |
+| 理解已确认的行为检查 | [验证说明](https://github.com/Stool233/cordis-formal-study/blob/main/docs/verification.zh-CN.md) |
+| 自己运行检查 | [复现指南](https://github.com/Stool233/cordis-formal-study/blob/main/docs/reproduce.zh-CN.md) |
 
-## 分支概览
+阅读论文为 [A Programming Paradigm for Spatiotemporal Composability，arXiv v1](https://arxiv.org/abs/2608.25512v1)。研究在固定的 fork 源码上检查依赖清理顺序、退休 consumer 的可发现性和替换 provider 的身份。
 
-`main` 跟随官方上游代码，另附本 fork 的文档。`codex/upstream-alignment-2026-09-09` 包含迁移后的生命周期修复与普通回归，不含运行时轨迹插桩。
+默认分支提供官方源码与本阅读指南。门户的[实现说明](https://github.com/Stool233/cordis-formal-study/blob/main/docs/implementation.zh-CN.md)选定包含修复的 fork 提交。具体回归检查通过，不代表任意插件 effect 或完整论文演算已获证明。
 
-研究门户继续固定三个历史实验分支。仅凭分支名不能确定证据版本；比较结果前，请先看[分支与证据](docs/formal-study.zh-CN.md#分支与证据)。
-
-## 关于 Cordis
-
-Cordis 的设计见论文 *A Programming Paradigm for Spatiotemporal Composability*：[论文仓库](https://github.com/cordiverse/paper)、[arXiv](https://arxiv.org/abs/2608.25512)。
-
-Cordis 正在快速开发，API 可能变化。本研究覆盖有限模型与选定的生命周期场景，不能据此断言所有插件或任意外部 effect 都正确。
+此前研究可从门户的[归档](https://github.com/Stool233/cordis-formal-study/blob/main/archive/README.zh-CN.md)追溯。

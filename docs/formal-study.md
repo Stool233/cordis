@@ -1,46 +1,21 @@
-# Using the Cordis study fork
+# Cordis implementation guide
 
 English | [中文](formal-study.zh-CN.md)
 
-This reference helps you choose a source revision and interpret its checks. The [study portal](https://github.com/Stool233/cordis-formal-study) owns cross-repository results and reproduction; the pinned conformance branch owns the executable specification.
+Use this page to locate the Cordis source selected by the [current study](https://github.com/Stool233/cordis-formal-study). The portal owns the paper reading, shared checks, and result report.
 
-## Branches and evidence
+## Read the selected source
 
-| Branch | Contents | Meaning |
-| --- | --- | --- |
-| `main` | Official upstream code plus fork documents | Current upstream reference. |
-| `codex/upstream-alignment-2026-09-09` | Fixes adapted to upstream `f8ea3cd` | Current migration candidate. |
-| `research/paper-trace-baseline` | Original logic plus observations | Success reproduces the exact known failures. |
-| `research/paper-conformance` | Fixes, observations, and TLA+ kit | Evidence belongs to the portal's pinned commit. |
-| `fix/paper-conformance` | Historical fixes without observations | Ordinary checks; `formalStatus: not-run`. |
+The study uses [Cordis core at 18c327f](https://github.com/Stool233/cordis/tree/18c327f4566e8f640737c43a480e6d74a0673579/packages/core/src), based on official [f8ea3cd](https://github.com/cordiverse/cordis/tree/f8ea3cd50f1a5724e8e715995bcde131c9c12b2c). The fork commit includes lifecycle fixes and ordinary regressions. Its branch is `codex/upstream-alignment-2026-09-09`; the full commit in the portal lock identifies the evidence.
 
-The historical stages remain evidence snapshots. The [alignment report](https://github.com/Stool233/cordis-formal-study/blob/main/docs/upstream-alignment.md) records the migration's revisions, tool hashes, and verification limits separately.
+Fiber manages plugin activation and cleanup. Its disposal path retains the consumer's registry entry until cleanup finishes and waits for dependent cleanup before provider recovery. Service resolution carries provider identity. The [paper guide](https://github.com/Stool233/cordis-formal-study/blob/main/docs/paper.md) explains the corresponding requirements.
 
-## What the migration changes
+## Check the behavior
 
-Consumers may still need a provider's resources during asynchronous cleanup. The migrated runtime keeps retiring consumers discoverable and waits for notified consumers before recovering the provider's effects.
+The portal runs three shared behavior checks on this source and on the Harness fork: dependency cleanup order, retirement discoverability, and replacement-provider identity. It exports committed source and executes real Context operations without trace instrumentation.
 
-It publishes the unloading state before changing the dependency epoch. One deferred checkpoint cancels stale activation and lets an awaited provider settle transitive consumers.
+Follow [Reproduction](https://github.com/Stool233/cordis-formal-study/blob/main/docs/reproduce.md) to run the checks. [Verification](https://github.com/Stool233/cordis-formal-study/blob/main/docs/verification.md) defines the inputs and the scope of a pass.
 
-The port retains upstream's failed-fiber re-entry guard. Loader checks its owning tree's lifecycle state before persisting self-disposal. Upstream HMR already snapshots old fibers before teardown and needs no additional logic patch.
+## Further reading
 
-Read [fiber.ts](../packages/core/src/fiber.ts), [loader](../packages/loader/src/index.ts), and [fiber.spec.ts](../packages/core/tests/fiber.spec.ts) on the migration branch. Links opened on `main` show upstream code.
-
-## Verify a checkout
-
-Use Node.js 24 and the Yarn version in [package.json](../package.json). After installing dependencies with the study's lock, run:
-
-```sh
-corepack yarn test core hmr loader include timer
-corepack yarn build core
-corepack yarn build
-corepack yarn lint
-```
-
-The [reproduction guide](https://github.com/Stool233/cordis-formal-study/blob/main/docs/reproduce.md) supplies the lock and formal procedure. Formal checks use separate instrumented copies; this migration checkout contains no trace sink or `formal/` runner.
-
-## Understand the limits
-
-Baseline success means expected failures were reproduced. Conformance success means the selected models, traces, premises, and mutation checks passed. Ordinary tests alone say nothing about TLC.
-
-The migration reuses the [historical paper-derived kit](https://github.com/Stool233/cordis/tree/d06ee04a4c1c0cdd9605cd3d77521f90220d098b/formal) with an explicitly recorded newer TLC artifact. It does not validate every theorem in the newer arXiv paper. See [Method](https://github.com/Stool233/cordis-formal-study/blob/main/docs/method.md).
+The [implementation reference](https://github.com/Stool233/cordis-formal-study/blob/main/docs/implementation.md) owns version selection and dependency details. The [archive](https://github.com/Stool233/cordis-formal-study/blob/main/archive/README.md) preserves earlier branches and model evidence.
